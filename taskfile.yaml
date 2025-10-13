@@ -1,0 +1,74 @@
+# https://taskfile.dev
+
+version: '3'
+
+
+tasks:
+  setup:
+    desc: "Install dependencies"
+    cmds:
+      - uv sync --extra dev --inexact --quiet
+
+  default:
+    desc: "Run all checks: `task`"
+    deps: [ setup, typecheck, lint, test ]
+
+  format:
+    desc: "Format"
+    cmds:
+      - ruff format src tests
+
+  lint:
+    desc: "Lint"
+    deps: [ format ]
+    cmds:
+      - ruff check src tests --fix
+
+  clear:
+    desc: "Clear __pycache__"
+    cmds:
+      - rm -rf ./**/*/__pycache__
+      - rm -rf ./**/__pycache__
+      - rm -rf ./__pycache__
+    silent: true
+
+  typecheck:
+    desc: "Typecheck"
+    env:
+      MYPYPATH: src
+    cmds:
+      - zuban check src tests
+      - mypy src tests
+      - pyright src tests
+
+
+  test:
+    desc: "Run tests"
+    deps: [ clear ]
+    cmds:
+      - coverage run --data-file .coverage --source src -m pytest
+      - coverage combine --append .coverage.pytest-cov .coverage
+      - coverage report
+    env:
+      PYTHONDONTWRITEBYTECODE: 1
+
+  htmlcov:
+    desc: "Run tests and open htmlcov in browser"
+    deps: [ test ]
+    cmds:
+      - coverage html
+      - open htmlcov/index.html
+
+  add:
+    desc: "Add optional dependency: `task add -- test pytest-cov`"
+    cmds:
+      - uv add --optional {{ .CLI_ARGS }}
+
+  remove:
+    desc: "Add optional dependency: `task add -- test pytest-cov`"
+    cmds:
+      - uv remove --optional {{.CLI_ARGS}}
+
+  sync:
+    cmds:
+      - uv sync $(for arg in {{.CLI_ARGS}}; do echo --extra $arg; done)
