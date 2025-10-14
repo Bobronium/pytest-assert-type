@@ -4,7 +4,7 @@ build-backend = "uv_build"
 
 [project]
 name = "pytest-assert-type"
-version = "0.1.0"
+version = "0.1.1"
 description = "Use typing.assert_type() to test runtime behavior"
 readme = "README.md"
 authors = [
