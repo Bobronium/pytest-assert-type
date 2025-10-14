@@ -14,8 +14,12 @@ permissions:
   contents: read
 
 jobs:
+  ci:
+    uses: ./.github/workflows/ci.yaml
+
   build:
     name: Build dists
+    needs: ci
     runs-on: ubuntu-latest
     outputs:
       is_prerelease: ${{ steps.detect.outputs.is_prerelease }}
