@@ -11,18 +11,18 @@ tasks:
 
   default:
     desc: "Run all checks: `task`"
-    deps: [ setup, typecheck, lint, test ]
+    deps: [ typecheck, lint, test ]
 
   format:
     desc: "Format"
     cmds:
-      - ruff format src tests
+      - uv run --inexact --extra lint ruff format src tests
 
   lint:
     desc: "Lint"
     deps: [ format ]
     cmds:
-      - ruff check src tests --fix
+      - uv run --inexact --extra lint ruff check src tests --fix
 
   clear:
     desc: "Clear __pycache__"
@@ -37,18 +37,20 @@ tasks:
     env:
       MYPYPATH: src
     cmds:
-      - zuban check src tests
-      - mypy src tests
-      - pyright src tests
+      - uv sync --inexact --quiet --extra typecheck
+      - uv run --no-sync zuban check src tests
+      - uv run --no-sync mypy src tests
+      - uv run --no-sync pyright src tests
 
 
   test:
     desc: "Run tests"
     deps: [ clear ]
     cmds:
-      - coverage run --data-file .coverage --source src -m pytest
-      - coverage combine --append .coverage.pytest-cov .coverage
-      - coverage report
+      - uv sync --inexact --quiet --extra test
+      - uv run --no-sync  coverage run --data-file .coverage --source src -m pytest
+      - uv run --no-sync coverage combine --append .coverage.pytest-cov .coverage
+      - uv run --no-sync coverage report
     env:
       PYTHONDONTWRITEBYTECODE: 1
 
@@ -56,7 +58,7 @@ tasks:
     desc: "Run tests and open htmlcov in browser"
     deps: [ test ]
     cmds:
-      - coverage html
+      - uv run --inexact --extra test coverage html
       - open htmlcov/index.html
 
   add:
