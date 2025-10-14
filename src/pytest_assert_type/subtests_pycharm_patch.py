@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2023-present Arseny Boykov (Bobronium) <mail@bobronium.me>
+#
+# SPDX-License-Identifier: MIT
+
 import logging
 from typing import TYPE_CHECKING
 from typing import Any

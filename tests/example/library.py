@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2023-present Arseny Boykov (Bobronium) <mail@bobronium.me>
+#
+# SPDX-License-Identifier: MIT
+
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Generic
