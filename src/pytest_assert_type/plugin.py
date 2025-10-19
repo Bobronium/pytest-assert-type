@@ -26,7 +26,7 @@ __all__ = ["assert_type"]
 try:  # pragma: no cover
     from typing import Never
 except ImportError:  # pragma: no cover
-    Never = object()  # should much guarantees we won't accidentally match it
+    Never = object()  # type: ignore[assignment]  # should much guarantees we won't accidentally match it
 
 T = TypeVar("T")
 
