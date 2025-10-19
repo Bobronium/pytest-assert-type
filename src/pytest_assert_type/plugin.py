@@ -7,7 +7,6 @@ from __future__ import annotations
 import ast
 from typing import TYPE_CHECKING
 from typing import Any
-from typing import Never
 from typing import NoReturn
 from typing import TypeVar
 from typing import _TypedDictMeta  #  type: ignore[attr-defined]
@@ -23,6 +22,11 @@ from pytest_assert_type import subtests_pycharm_patch
 
 __all__ = ["assert_type"]
 
+
+try:  # pragma: no cover
+    from typing import Never
+except ImportError:  # pragma: no cover
+    Never = object()  # should much guarantees we won't accidentally match it
 
 T = TypeVar("T")
 
@@ -139,7 +143,7 @@ class AssertTypeToSubtest(AssertionRewriter):
         match pytest_raises, assert_function_name.id, call.args:
             case (None, "assert_never", [expression]):
                 return self._skip_statement("assert_never(...)", stmt)
-            case (
+            case (  # pragma: no cover
                 None,
                 "assert_type",
                 [
@@ -154,9 +158,9 @@ class AssertTypeToSubtest(AssertionRewriter):
             ):
                 return self._skip_statement(f"assert_type(..., {name})", stmt)
 
-            case [_, _, [expression, *_]]:  # pragma: no cover
+            case [_, _, [expression, *_]]:
                 pass
-            case _:
+            case _:  # pragma: no cover
                 raise NotImplementedError(
                     "Expected assert_type or assert_never to have one argument"
                 )
