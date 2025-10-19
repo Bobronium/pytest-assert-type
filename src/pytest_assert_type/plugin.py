@@ -24,9 +24,9 @@ __all__ = ["assert_type"]
 
 
 try:  # pragma: no cover
-    from typing import Never
+    from typing import Never  # type: ignore[attr-defined,unused-ignore]
 except ImportError:  # pragma: no cover
-    Never = object()  # type: ignore[assignment]  # should much guarantees we won't accidentally match it
+    Never = object()  # type: ignore[assignment,unused-ignore]  # should much guarantees we won't accidentally match it
 
 T = TypeVar("T")
 
