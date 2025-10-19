@@ -13,6 +13,7 @@ from typing import NoReturn
 import pytest
 from pytest_subtests import SubTests
 from typing_extensions import Never
+from typing_extensions import assert_never
 from typing_extensions import assert_type
 
 import pytest_assert_type
@@ -39,6 +40,9 @@ def test_assert_type() -> None:  # no need to add subtests/fixture args yourself
     with pytest.raises(SystemExit):
         assert_type(sys.exit(), Never)
 
+    with pytest.raises(SystemExit):
+        assert_never(sys.exit())
+
     if not TYPE_CHECKING:
         assert_type(sys.exit(), NoReturn)
 
@@ -46,6 +50,8 @@ def test_assert_type() -> None:  # no need to add subtests/fixture args yourself
 
         with contextlib.nullcontext():
             assert_type(sys.exit(), Never)
+
+        assert_never(sys.exit())
 
 
 def test_not_decorated() -> None:
@@ -83,6 +89,14 @@ def test_different_decorator() -> None:
         assert_type(1, str)  # type: ignore[arg-type,type-arg,assignment]
 
 
+# subtest doesn't support xfail, that's a shame...
+# @pytest.mark.xfail(strict=True, raises=AssertionError)
+# @pytest_assert_type.check
+# def test_fail_to_raise():
+#     with pytest.raises(SystemExit):
+#         assert_never(...)
+
+
 class Test:
     @pytest_assert_type.check
     def test_assert_type_as_method(self) -> None:
@@ -102,6 +116,9 @@ class Test:
         with pytest.raises(SystemExit):
             assert_type(sys.exit(), Never)
 
+        with pytest.raises(SystemExit):
+            assert_never(sys.exit())
+
         if not TYPE_CHECKING:
             assert_type(sys.exit(), NoReturn)
 
@@ -109,6 +126,8 @@ class Test:
 
             with contextlib.nullcontext():
                 assert_type(sys.exit(), Never)  # still skipped
+
+            assert_type(sys.exit(), NoReturn)
 
         assignment: Literal[1] = 1
 
@@ -147,3 +166,10 @@ class Test:
     ) -> None:
         with subtests.test("sub"):
             assert_type_fixture(1, int)
+
+    # subtest doesn't support xfail, that's a shame...
+    # @pytest.mark.xfail(strict=True, raises=AssertionError)
+    # @pytest_assert_type.check
+    # def test_fail_to_raise_as_method(self):
+    #     with pytest.raises(SystemExit):
+    #         assert_never(...)
