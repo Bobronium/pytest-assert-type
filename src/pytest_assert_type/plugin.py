@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import ast
+import dataclasses
 from typing import TYPE_CHECKING
 from typing import Any
 from typing import NoReturn
@@ -23,9 +24,9 @@ from pytest_assert_type import subtests_pycharm_patch
 __all__ = ["assert_type"]
 
 
-try:  # pragma: no cover
+try:
     from typing import Never  # type: ignore[attr-defined,unused-ignore]
-except ImportError:  # pragma: no cover
+except ImportError:
     Never = object()  # type: ignore[assignment,unused-ignore]  # should much guarantees we won't accidentally match it
 
 T = TypeVar("T")
@@ -49,11 +50,15 @@ else:
             # so, we shall not interfere
             return
 
+        from pydantic import BaseModel
         from pydantic import ConfigDict
         from pydantic import TypeAdapter
         from pydantic import ValidationError
 
-        if issubclass(type(typ), _TypedDictMeta | typing_extensions._TypedDictMeta):  # noqa: SLF001
+        if issubclass(
+            type(typ),
+            _TypedDictMeta | typing_extensions._TypedDictMeta | BaseModel,  # noqa: SLF001
+        ) or dataclasses.is_dataclass(typ):
             config = None
         else:
             config = ConfigDict(strict=True, arbitrary_types_allowed=True)
@@ -112,7 +117,7 @@ class AssertTypeToSubtest(AssertionRewriter):
     def _process_statements(self, body: list[ast.stmt], pytest_raises: ast.With | None) -> None:
         for i, stmt in enumerate(body):
             match stmt:
-                case ast.Expr(  # pragma: no cover (cov says pattern never matches ?)
+                case ast.Expr(
                     value=ast.Call(func=ast.Name(id="assert_type" | "assert_never")) as call
                 ):
                     body[i] = self._maybe_wrap(stmt, call, pytest_raises)
@@ -132,7 +137,7 @@ class AssertTypeToSubtest(AssertionRewriter):
                     func=ast.Attribute(value=ast.Name(id="pytest"), attr="raises"),
                 ):
                     return True
-                case _:  # pragma: no cover
+                case _:
                     pass
         return False
 
@@ -143,7 +148,7 @@ class AssertTypeToSubtest(AssertionRewriter):
         match pytest_raises, assert_function_name.id, call.args:
             case (None, "assert_never", [expression]):
                 return self._skip_statement("assert_never(...)", stmt)
-            case (  # pragma: no cover
+            case (
                 None,
                 "assert_type",
                 [
