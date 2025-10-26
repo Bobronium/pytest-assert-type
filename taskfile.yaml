@@ -1,28 +1,63 @@
+# Taskfile.yml
 # https://taskfile.dev
 
 version: '3'
 
+# ---------- Globals / switches ----------
+vars:
+  ALL_PY:
+    sh: |
+      uv run --no-sync --isolated --python 3.13 - <<'PY'
+      import re, sys, pathlib, tomllib
+      data = tomllib.loads(pathlib.Path("pyproject.toml").read_text())
+      cl = data.get("project", {}).get("classifiers", [])
+      vers = [m.group(1) for s in cl if (m:=re.search(r"Python :: (\d\.\d+)$", s))]
+      print(" ".join(sorted(set(vers))))
+      PY
+
+
+  MATRIX: '{{ .MATRIX | default "false" }}'
+
+  VERSIONS: '{{ .VERSIONS | default "" }}'
+
+  # Current interpreter MAJOR.MINOR (used when MATRIX=false and VERSIONS empty)
+  PY_CURRENT:
+    sh: |
+      python - <<'PY'
+      import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")
+      PY
+
+  # Produce a space-separated list for shell loops.
+  PY_LIST:
+    sh: |
+      if [ -n "{{.VERSIONS}}" ]; then
+        echo "{{.VERSIONS}}" | tr ',' ' '
+      elif [ "{{.MATRIX}}" = "true" ]; then
+        echo "{{ join " " .ALL_PY }}"
+      else
+        echo "{{ .PY_CURRENT }}"
+      fi
 
 tasks:
   setup:
     desc: "Install dependencies"
-    cmds:
-      - uv sync --extra dev --inexact --quiet
+    cmd: uv sync --extra dev --inexact --quiet
 
   default:
-    desc: "Run all checks: `task`"
+    desc: "Run all checks (current venv by default; matrix when MATRIX=true)"
     deps: [ typecheck, lint, test ]
 
   format:
     desc: "Format"
-    cmds:
-      - uv run --inexact --extra lint ruff format src tests
+    cmd: uv run --inexact --extra lint ruff format src tests
 
   lint:
     desc: "Lint"
     deps: [ format ]
-    cmds:
-      - uv run --inexact --extra lint ruff check src tests --fix
+    cmd: uv run --inexact --extra lint ruff check src tests --fix
+
+  license:
+    reuse annotate --license MIT --copyright "Arseny Boykov (Bobronium) <hi@bobronium.me>" -y 2025-present
 
   clear:
     desc: "Clear __pycache__"
@@ -32,27 +67,94 @@ tasks:
       - rm -rf ./__pycache__
     silent: true
 
+  # -------- Type checking (no command duplication; fish-safe via bash wrapper) ----------
   typecheck:
-    desc: "Typecheck"
+    desc: "Typecheck (current venv by default; matrix when MATRIX=true / VERSIONS=...)"
+    env:
+      MYPYPATH: src
+
+  typecheck:
+    desc: "Typecheck (current venv by default; matrix when MATRIX=true / VERSIONS=...)"
     env:
       MYPYPATH: src
     cmds:
-      - uv sync --inexact --quiet --extra typecheck
-      - uv run --no-sync zuban check src tests
-      - uv run --no-sync mypy src tests
-      - uv run --no-sync pyright src tests
+      - |
+        bash -euo pipefail -c '
+          PLATFORMS=("darwin" "linux" "win32")
 
+          run_typecheck () {
+            local PYTHON_VERSION_VALUE="$1"
+            local PLATFORM_VALUE="$2"
+            local PYRIGHT_PLATFORM_VALUE
 
+            case "$PLATFORM_VALUE" in
+              darwin) PYRIGHT_PLATFORM_VALUE="Darwin" ;;
+              linux)  PYRIGHT_PLATFORM_VALUE="Linux" ;;
+              win32)  PYRIGHT_PLATFORM_VALUE="Windows" ;;
+            esac
+
+            echo "▶ Typechecking Python version $PYTHON_VERSION_VALUE on platform $PLATFORM_VALUE"
+
+            uv sync --inexact --quiet --extra typecheck
+
+            #uv run --no-sync zuban check src tests --python-version "$PYTHON_VERSION_VALUE" --platform "$PLATFORM_VALUE"
+            uv run --no-sync mypy src tests --python-version "$PYTHON_VERSION_VALUE" --platform "$PLATFORM_VALUE"
+            uv run --no-sync pyright src tests --pythonversion "$PYTHON_VERSION_VALUE" --pythonplatform "$PYRIGHT_PLATFORM_VALUE"
+          }
+
+          if [ "{{.MATRIX}}" != "true" ] && [ -z "{{.VERSIONS}}" ]; then
+            PYTHON_CURRENT="{{.PY_CURRENT}}"
+            PLATFORM_CURRENT=$(uname -s | tr "[:upper:]" "[:lower:]")
+            run_typecheck "$PYTHON_CURRENT" "$PLATFORM_CURRENT"
+            exit 0
+          fi
+
+          for PLATFORM_ITEM in "${PLATFORMS[@]}"; do
+            for PYTHON_VERSION_ITEM in {{.PY_LIST}}; do
+              run_typecheck "$PYTHON_VERSION_ITEM" "$PLATFORM_ITEM"
+            done
+          done
+        '
+  # -------- Tests / coverage (no command duplication; fish-safe via bash wrapper) ----------
   test:
-    desc: "Run tests"
+    desc: "Run tests (current venv by default; matrix when MATRIX=true / VERSIONS=...)"
     deps: [ clear ]
-    cmds:
-      - uv sync --inexact --quiet --extra test
-      - uv run --no-sync  coverage run --data-file .coverage --source src -m pytest
-      - uv run --no-sync coverage combine --append .coverage.pytest-cov .coverage
-      - uv run --no-sync coverage report
     env:
       PYTHONDONTWRITEBYTECODE: 1
+    cmds:
+      - |
+        bash -euo pipefail -c '          
+          rm -f .coverage .coverage.pytest-cov
+        
+          if [ "{{.MATRIX}}" != "true" ] && [ -z "{{.VERSIONS}}" ]; then
+            echo "▶ Tests on current environment"
+            uv sync --inexact --quiet --extra test
+            uv run --no-sync coverage run --data-file .coverage --source src -m pytest
+            uv run --no-sync coverage combine --append .coverage.pytest-cov .coverage
+            uv run --no-sync coverage report
+            exit 0
+          fi
+
+          # Matrix path (use --active inside each venv)
+          for V in {{.PY_LIST}}; do
+            echo "▶ Tests on Python $V"
+            VENV=".task/venv${V}"
+            if [ ! -d "$VENV" ]; then
+              uv venv --clear --no-project --python "$V" "$VENV"; 
+            fi
+            ACT="$VENV/bin/activate"
+            if [ -f "$VENV/Scripts/activate" ]; then ACT="$VENV/Scripts/activate"; fi
+            . "$ACT"
+
+            uv sync --active --inexact --quiet --extra test
+            uv run --active --no-sync coverage run --append --data-file .coverage --source src -m pytest --cov-append
+
+            deactivate
+          done
+
+          uv run --inexact --extra test coverage combine --append .coverage .coverage.pytest-cov
+          uv run --inexact --extra test coverage report
+        '
 
   htmlcov:
     desc: "Run tests and open htmlcov in browser"
@@ -67,10 +169,11 @@ tasks:
       - uv add --optional {{ .CLI_ARGS }}
 
   remove:
-    desc: "Add optional dependency: `task add -- test pytest-cov`"
+    desc: "Remove optional dependency: `task remove -- test pytest-cov`"
     cmds:
-      - uv remove --optional {{.CLI_ARGS}}
+      - uv remove --optional {{ .CLI_ARGS }}
 
   sync:
+    desc: "Sync with extras by name: `task sync -- test typecheck`"
     cmds:
-      - uv sync $(for arg in {{.CLI_ARGS}}; do echo --extra $arg; done)
+      - uv sync $(for arg in {{.CLI_ARGS}}; do echo --extra "$arg"; done)
