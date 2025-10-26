@@ -5,31 +5,41 @@
 from __future__ import annotations
 
 import ast
-import dataclasses
 from typing import TYPE_CHECKING
 from typing import Any
 from typing import NoReturn
 from typing import TypeVar
-from typing import _TypedDictMeta  #  type: ignore[attr-defined]
 from typing import cast
 
 import _pytest.assertion.rewrite
 import pytest
-import typing_extensions
 from _pytest.assertion.rewrite import AssertionRewriter
-from pydantic import PydanticUserError
 
 from pytest_assert_type import subtests_pycharm_patch
+from pytest_assert_type.validator import ValidationError
+from pytest_assert_type.validator import validate
+
+try:
+    from typing_extensions import NoReturn as ExtensionsNoReturn  # type: ignore[attr-defined,unused-ignore]  # noqa: I001, UP035
+
+    from typing_extensions import Never as ExtensionsNever  # type: ignore[attr-defined,unused-ignore]
+except ImportError:
+    ExtensionsNever = object()  # type: ignore[assignment,unused-ignore]
+    ExtensionsNoReturn = object()  # type: ignore[assignment,unused-ignore]
 
 __all__ = ["assert_type"]
-
 
 try:
     from typing import Never  # type: ignore[attr-defined,unused-ignore]
 except ImportError:
-    Never = object()  # type: ignore[assignment,unused-ignore]  # should much guarantees we won't accidentally match it
+    Never = object()  # type: ignore[assignment,unused-ignore]
 
 T = TypeVar("T")
+
+
+def is_never(typ: type[T]) -> bool:
+    return typ in {Never, NoReturn, ExtensionsNever, ExtensionsNoReturn}  # type: ignore[comparison-overlap,unused-ignore]
+
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -37,37 +47,20 @@ if TYPE_CHECKING:
     from typing_extensions import assert_type
 else:
 
-    def assert_type(val: T, typ: type[T] = typing_extensions.Never, /) -> None:
+    def assert_type(val: T, typ: type[T] = NoReturn, /) -> None:
         __tracebackhide__ = True
 
-        if typ in {
-            Never,
-            NoReturn,
-            typing_extensions.Never,
-            typing_extensions.NoReturn,
-        }:  # pragma: no cover
+        if is_never(typ):  # pragma: no cover
             # if we end up here, it means code that must have produced error, did not
             # so, we shall not interfere
             return
 
-        from pydantic import BaseModel
-        from pydantic import ConfigDict
-        from pydantic import TypeAdapter
-        from pydantic import ValidationError
-
-        if issubclass(
-            type(typ),
-            _TypedDictMeta | typing_extensions._TypedDictMeta | BaseModel,  # noqa: SLF001
-        ) or dataclasses.is_dataclass(typ):
-            config = None
-        else:
-            config = ConfigDict(strict=True, arbitrary_types_allowed=True)
         try:
-            TypeAdapter(typ, config=config).validate_python(val)
+            validate(val, typ)
         except ValidationError as e:
-            raise AssertionError(f"Expected value of type `{e.title}`, got `{val}`") from None
-        except PydanticUserError as e:  # pragma: no cover
-            raise TypeError(e) from None
+            raise AssertionError(
+                f"Expected value of type `{e.title}`, got `{e.actual}` ({val!r})"
+            ) from None
 
 
 @pytest.fixture
@@ -99,7 +92,6 @@ class AssertTypeToSubtest(AssertionRewriter):
                     ),
                 ):
                     break
-
         else:
             return
 

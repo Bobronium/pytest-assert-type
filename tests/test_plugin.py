@@ -30,7 +30,9 @@ def test_assert_type() -> None:  # no need to add subtests/fixture args yourself
     if not TYPE_CHECKING:
         with pytest.raises(
             AssertionError,
-            match=re.escape("Expected value of type `dict[str,int]`, got `{'x': 'nope'}`"),
+            match=re.escape(
+                "Expected value of type `dict[str,int]`, got `dict[str,str]` ({'x': 'nope'})"
+            ),
         ):
             assert_type({"x": "nope"}, dict[str, int])  # type: ignore[arg-type,type-arg,assignment]
 
@@ -106,7 +108,9 @@ class Test:
         if not TYPE_CHECKING:
             with pytest.raises(
                 AssertionError,
-                match=re.escape("Expected value of type `dict[str,int]`, got `{'x': 'nope'}`"),
+                match=re.escape(
+                    "Expected value of type `dict[str,int]`, got `dict[str,str]` ({'x': 'nope'})"
+                ),
             ):
                 assert_type({"x": "nope"}, dict[str, int])  # type: ignore[arg-type,type-arg,assignment]
 

@@ -12,13 +12,16 @@ authors = [
 ]
 requires-python = ">=3.10"
 license = { text = "MIT" }
-keywords = ["pytest", "plugin", "subtests", "typing", "pydantic", "assert_type"]
+keywords = ["pytest", "plugin", "subtests", "typing", "assert_type"]
 classifiers = [
     "Framework :: Pytest",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "License :: OSI Approved :: MIT License",
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
@@ -28,7 +31,6 @@ classifiers = [
 dependencies = [
     "pytest>=6.2.0",
     "pytest-subtests>=0.4",
-    "pydantic>=2.0",
     "typing-extensions>=4.8; python_version < '3.12'",
 ]
 
@@ -45,6 +47,10 @@ dev = [
     "pytest-assert-type[lint]",
     "pytest-assert-type[typecheck]",
     "pytest-assert-type[test]",
+    "pytest-assert-type[git]",
+]
+git = [
+    "prek"
 ]
 lint = [
     "ruff>=0.1.9",
@@ -84,7 +90,7 @@ omit = [
 
 [tool.coverage.report]
 exclude_lines = [
-    "no cov",
+    "pragma: no cover",
     "if __name__ == .__main__.:",
     "if TYPE_CHECKING:",
 ]
@@ -133,15 +139,12 @@ extend-ignore = [
 "__init__.py" = ["F401", "I001", "F811"]
 "__about__.py" = ["ALL"]
 "tests/*" = ["S101", "ANN", "ERA", "SLOT", "SLF", "PLW", "PT0", "N", "FIX", "TD", "B024", "PLE", "PYI", "PLC", "BLE", "S", "PERF"]
-"data/*" = ["ALL"]
 
 [tool.ruff.lint.pep8-naming]
 extend-ignore-names = ["mcs"]
 
 [tool.ruff.lint.isort]
 force-single-line = true
-sections = { "duper_compile_support" = ["duper._compile_support"] }
-section-order = ["future", "duper_compile_support", "standard-library", "third-party", "first-party", "local-folder"]
 
 [tool.ruff.lint.flake8-tidy-imports]
 ban-relative-imports = "all"
