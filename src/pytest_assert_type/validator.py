@@ -31,6 +31,10 @@ TypeVarT = TypeVar("TypeVarT")
 def _pretty_type(type_spec: Any) -> str:  # noqa: PLR0911, PLR0912
     """Render a stable, compact representation of a typing spec for error messages."""
     # Treat GenericAlias specially: it represents e.g. dict[str, int], list[int] on 3.10
+    # typing.NewType objects are callables with a __supertype__ and __name__
+    if hasattr(type_spec, "__supertype__") and hasattr(type_spec, "__name__"):
+        # Prefer the declared alias name for stable, human-friendly output
+        return typing.cast("str", type_spec.__name__)
     if isinstance(type_spec, types.GenericAlias):
         origin, args = _origin_and_args(type_spec)
         # Builtin containers
@@ -251,6 +255,9 @@ def _matches(value: Any, expected_type: Any) -> bool:  # noqa: PLR0911, PLR0912
     """Return True if 'value' conforms to 'expected_type' (Python 3.10+ typing forms)."""
     if expected_type is Any:
         return True
+
+    while hasattr(expected_type, "__supertype__"):
+        expected_type = expected_type.__supertype__
 
     # Plain classes (including dataclasses without parameters)
     if isinstance(expected_type, type) and get_origin(expected_type) is None:

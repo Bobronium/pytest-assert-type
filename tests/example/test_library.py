@@ -4,6 +4,8 @@
 
 from __future__ import annotations
 
+from typing import NewType
+
 from typing_extensions import assert_type
 
 import pytest_assert_type
@@ -14,6 +16,8 @@ from tests.example.library import make_user
 from tests.example.library import parse_number
 from tests.example.library import size
 
+FloatingBox = NewType("FloatingBox", Box[float])
+
 
 def test_generics_and_map() -> None:
     b = Box(21)
@@ -21,6 +25,7 @@ def test_generics_and_map() -> None:
     assert_type(b, Box[int])
     assert_type(b2, Box[float])
     assert_type(b2.value, float)
+    assert_type(FloatingBox(b2), FloatingBox)
 
 
 @pytest_assert_type.check
